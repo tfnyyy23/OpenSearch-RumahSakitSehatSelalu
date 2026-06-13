@@ -44,6 +44,19 @@ async def ask(request: QuestionRequest):
     query_type = intent.get("query_type", "summary")
     filters    = intent.get("filters", {}) or {}
 
+    # Check if out of scope
+    if query_type == "out_of_scope":
+        try:
+            answer = gemini.format_out_of_scope_answer(question)
+            return QuestionResponse(
+                question=question,
+                answer=answer,
+                data={},
+                query_type=query_type,
+            )
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Gemini out-of-scope response error: {e}")
+
     # Fallback ke summary kalau query_type tidak dikenal
     query_fn = QUERY_MAP.get(query_type, os_client.summary_stats)
 

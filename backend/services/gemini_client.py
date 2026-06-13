@@ -54,6 +54,7 @@ Query types yang tersedia:
 - per_bulan            : tren biaya per bulan
 - per_status_kunjungan : biaya per status kunjungan (rawat inap, rawat jalan, darurat)
 - metode_bayar         : distribusi metode pembayaran
+- out_of_scope         : pertanyaan di luar lingkup analitik biaya rumah sakit Sehat Selalu (seperti pertanyaan medis umum, keluhan klinis pasien, info/jadwal dokter, obrolan santai, dll.)
 
 Filter yang bisa diekstrak (semua opsional):
 - poli         : string, contoh "Mata", "Anak", "Jantung"
@@ -77,6 +78,13 @@ def parse_intent(question: str) -> dict:
     model = _get_model()
     if model is None:
         lowered = question.lower()
+        
+        # Fallback out-of-scope check: if no financial/cost keyword is present
+        cost_keywords = ["biaya", "tarif", "harga", "tagihan", "dana", "pendapatan", "bayar", "uang", "rupiah", "rp", "tren", "distribusi", "rata-rata", "total", "spend", "cost", "bill"]
+        has_cost_keyword = any(kw in lowered for kw in cost_keywords)
+        if not has_cost_keyword:
+            return {"query_type": "out_of_scope", "filters": {}}
+
         query_type = "summary"
 
         if "rata-rata" in lowered or "rata rata" in lowered:
@@ -148,9 +156,40 @@ def format_answer(question: str, data: dict) -> str:
 
         return json.dumps(data, ensure_ascii=False, indent=2)
 
-    prompt = FORMAT_PROMPT.format(
-        question=question,
-        data=json.dumps(data, ensure_ascii=False, indent=2),
-    )
+    response = model.generate_content(prompt)
+    return response.text.strip()
+
+
+# ---------------------------------------------------------------------------
+# Out-of-Scope handling
+# ---------------------------------------------------------------------------
+
+OUT_OF_SCOPE_PROMPT = """
+Kamu adalah asisten analisis biaya operasional Rumah Sakit Sehat Selalu.
+Pertanyaan pengguna berikut di luar lingkup tugasmu:
+"{question}"
+
+Instruksi:
+1. Berikan jawaban penolakan yang sopan, ramah, dan profesional dalam Bahasa Indonesia.
+2. Jelaskan secara singkat bahwa tugasmu hanya berkaitan dengan analisis biaya operasional rumah sakit (seperti biaya obat, tindakan, kamar, tarif dokter, tren biaya bulanan, poli, metode pembayaran, atau keuangan).
+3. Berikan contoh 2-3 pertanyaan analitis biaya rumah sakit yang bisa diajukan (misal: "Berapa total biaya operasional?", "Poli mana yang menghabiskan biaya terbesar?", "Bagaimana tren biaya per bulan?").
+4. Jawaban maksimal 80 kata.
+"""
+
+
+def format_out_of_scope_answer(question: str) -> str:
+    """Politely explain that the query is out of scope and give cost question examples."""
+    model = _get_model()
+    if model is None:
+        return (
+            "Maaf, pertanyaan Anda berada di luar lingkup analisis biaya operasional Rumah Sakit Sehat Selalu. "
+            "Saya hanya dapat membantu Anda menganalisis data keuangan rumah sakit seperti tren biaya kamar, obat, tindakan, atau dokter.\n\n"
+            "Contoh pertanyaan:\n"
+            "- Berapa total biaya operasional rumah sakit?\n"
+            "- Poli mana yang menghabiskan biaya terbesar?\n"
+            "- Bagaimana tren biaya per bulan?"
+        )
+
+    prompt = OUT_OF_SCOPE_PROMPT.format(question=question)
     response = model.generate_content(prompt)
     return response.text.strip()
