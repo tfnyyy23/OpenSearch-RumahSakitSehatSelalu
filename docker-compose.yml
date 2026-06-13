@@ -5,7 +5,7 @@ services:
   # OpenSearch Node
   # ===========================
   opensearch:
-    image: opensearchproject/opensearch:2.11.0
+    image: opensearchproject/opensearch:2.13.0
     container_name: opensearch-node
     environment:
       - cluster.name=rumah-sakit-cluster
@@ -38,7 +38,7 @@ services:
   # OpenSearch Dashboards
   # ===========================
   opensearch-dashboards:
-    image: opensearchproject/opensearch-dashboards:2.11.0
+    image: opensearchproject/opensearch-dashboards:2.13.0
     container_name: opensearch-dashboards
     ports:
       - "5601:5601"
@@ -68,7 +68,7 @@ services:
       - OPENSEARCH_PORT=9200
       - OPENSEARCH_USER=admin
       - OPENSEARCH_PASS=Admin@12345
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
       - DATA_DIR=/app/data
     volumes:
       - ./data:/app/data:ro

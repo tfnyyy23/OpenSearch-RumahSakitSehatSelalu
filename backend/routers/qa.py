@@ -79,3 +79,15 @@ async def health():
         }
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e))
+
+
+@router.get("/stats")
+async def get_stats():
+    try:
+        stats = os_client.get_database_stats()
+        return {
+            "status": "healthy",
+            "ringkasan": stats
+        }
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"Gagal mengambil statistik database: {e}")

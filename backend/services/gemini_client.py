@@ -24,7 +24,12 @@ def _get_model():
         try:
             import google.generativeai as genai
 
-            genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+            api_key = os.getenv("GEMINI_API_KEY")
+            if not api_key or api_key.strip() == "":
+                _genai_error = Exception("GEMINI_API_KEY is not set.")
+                return None
+
+            genai.configure(api_key=api_key)
             _genai = genai.GenerativeModel("gemini-1.5-flash")
         except Exception as exc:
             _genai_error = exc
