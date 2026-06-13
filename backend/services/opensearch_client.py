@@ -261,9 +261,67 @@ def summary_stats(filters: dict | None = None) -> dict:
     }
 
 
+def get_database_stats() -> dict:
+    """Get unique counts of doctor, patient, registration, and tagihan."""
+    body = {
+        "size": 0,
+        "aggs": {
+            "dokter_count": {"cardinality": {"field": "doctor_id"}},
+            "pasien_count": {"cardinality": {"field": "pasien_id"}},
+            "register_count": {"cardinality": {"field": "register_id"}},
+            "tagihan_count": {"value_count": {"field": "bills_id"}},
+        }
+    }
+    res = run_query(body)
+    aggs = res["aggregations"]
+    return {
+        "dokter": aggs["dokter_count"]["value"],
+        "pasien": aggs["pasien_count"]["value"],
+        "registrasi": aggs["register_count"]["value"],
+        "tagihan": aggs["tagihan_count"]["value"],
+    }
+
+
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+def _normalize_filter_value(field: str, val: str) -> str:
+    if not isinstance(val, str):
+        return val
+
+    val = val.strip()
+
+    if field == "status_kunjungan":
+        return val.lower()
+
+    if field == "metode_bayar":
+        if val.upper() == "BPJS":
+            return "BPJS"
+        return val.title()
+
+    if field in ("poli", "spesialisasi"):
+        if val.upper() == "THT":
+            return "THT"
+        words = val.split()
+        capitalized_words = []
+        for w in words:
+            if w.upper() == "THT":
+                capitalized_words.append("THT")
+            else:
+                capitalized_words.append(w[0].upper() + w[1:].lower() if len(w) > 0 else "")
+        return " ".join(capitalized_words)
+
+    if field == "jenis_kelamin":
+        lowered = val.lower()
+        if "laki" in lowered:
+            return "Laki-laki"
+        if "perempuan" in lowered or "wanita" in lowered:
+            return "Perempuan"
+        return val.title()
+
+    return val
+
 
 def _build_filter(filters: dict | None) -> dict:
     """Convert a simple filter dict to an OpenSearch bool/filter query."""
@@ -275,7 +333,8 @@ def _build_filter(filters: dict | None) -> dict:
         if isinstance(value, dict) and ("gte" in value or "lte" in value):
             must.append({"range": {field: value}})
         else:
-            must.append({"term": {field: value}})
+            normalized_value = _normalize_filter_value(field, value)
+            must.append({"term": {field: normalized_value}})
 
     return {"bool": {"filter": must}}
 
